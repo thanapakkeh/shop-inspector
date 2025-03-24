@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ตรวจร้านค้า</title>
+  <style>
+    body {
+      font-family: 'Sarabun', sans-serif;
+      margin: 0;
+      padding: 0;
+      background-color: #f4f4f4;
+    }
+    .container {
+      max-width: 500px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+    h1, h2 {
+      text-align: center;
+    }
+    .card {
+      background: white;
+      border-radius: 15px;
+      padding: 20px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+      margin-top: 20px;
+    }
+    select, input {
+      width: 100%;
+      padding: 10px;
+      margin-top: 10px;
+      border-radius: 10px;
+      border: 1px solid #ccc;
+      font-size: 16px;
+    }
+    button {
+      width: 100%;
+      padding: 12px;
+      margin-top: 15px;
+      background: #4CAF50;
+      color: white;
+      font-size: 16px;
+      border: none;
+      border-radius: 10px;
+      cursor: pointer;
+    }
+    button:hover {
+      background: #45a049;
+    }
+    table {
+      width: 100%;
+      margin-top: 20px;
+      border-collapse: collapse;
+    }
+    th, td {
+      border-bottom: 1px solid #ddd;
+      padding: 10px;
+      text-align: left;
+    }
+    .highlight {
+      color: red;
+      font-size: 18px;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="card" id="selectInspector">
+      <h1>เลือกชื่อผู้ตรวจ</h1>
+      <select id="inspectorSelect"></select>
+      <button onclick="goToSearchPage()">ถัดไป</button>
+    </div>
+
+    <div class="card" id="searchPage" style="display:none">
+      <h2>ค้นหารหัสร้าน</h2>
+      <input type="text" id="shopCode" placeholder="ใส่รหัสร้าน เช่น A001" />
+      <button onclick="searchShop()">ค้นหา</button>
+
+      <div id="shopInfo"></div>
+      <table id="resultTable" style="display:none">
+        <thead>
+          <tr><th>เดือน</th><th>ผู้ตรวจ</th></tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+
+  <script>
+    const data1URL = "https://script.google.com/macros/s/AKfycbyzb2xncT4NYvwZ1SlA-Ypw7q-kfphgRvmmJat2I8wbX925WYRWlFbxZP27rJy334Gv9Q/exec";
+    const data2URL = "https://script.google.com/macros/s/AKfycbyaQaQ6aS8_AEpusEynV0za7Uu2LvmwjzlJLDWJYE9b4Ebh-o2jbqSgav6jbOQYyrWL_g/exec";
+
+    let selectedInspector = "";
+    let data1 = [];
+    let data2 = [];
+
+    async function loadData() {
+      const [res1, res2] = await Promise.all([
+        fetch(data1URL),
+        fetch(data2URL)
+      ]);
+      data1 = await res1.json();
+      data2 = await res2.json();
+
+      const inspectorSet = new Set();
+      data1.forEach(row => {
+        Object.keys(row).forEach(key => {
+          if (key !== "รหัสร้าน" && row[key]) inspectorSet.add(row[key]);
+        });
+      });
+      const select = document.getElementById("inspectorSelect");
+      Array.from(inspectorSet).sort().forEach(name => {
+        const option = document.createElement("option");
+        option.text = name;
+        option.value = name;
+        select.add(option);
+      });
+    }
+
+    function goToSearchPage() {
+      const select = document.getElementById("inspectorSelect");
+      selectedInspector = select.value;
+      if (selectedInspector) {
+        document.getElementById("selectInspector").style.display = "none";
+        document.getElementById("searchPage").style.display = "block";
+      } else {
+        alert("กรุณาเลือกชื่อผู้ตรวจ");
+      }
+    }
+
+    function searchShop() {
+      const code = document.getElementById("shopCode").value.trim();
+      const info = document.getElementById("shopInfo");
+      const table = document.getElementById("resultTable");
+      const tbody = table.querySelector("tbody");
+      tbody.innerHTML = "";
+
+      const shop = data2.find(row => row["รหัสร้าน"] === code);
+      if (!shop) {
+        info.innerHTML = `<p style='color:red;'>ไม่พบข้อมูลร้าน ${code}</p>`;
+        table.style.display = "none";
+        return;
+      }
+
+      info.innerHTML = `<p><strong>ข้อมูลร้าน:</strong> ${shop["ชื่อร้าน"] || "-"} (${code})<br>
+      พื้นที่: ${shop["พื้นที่"] || "-"} | ประเภท: ${shop["ประเภท"] || "-"}</p>`;
+
+      const months = ["มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน",
+                      "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม"];
+      const year = 2568;
+
+      const inspectorRow = data1.find(row => row["รหัสร้าน"] === code);
+      if (!inspectorRow) {
+        tbody.innerHTML = `<tr><td colspan='2'>ไม่พบข้อมูลผู้ตรวจ</td></tr>`;
+        table.style.display = "table";
+        return;
+      }
+
+      months.forEach(month => {
+        const inspector = inspectorRow[month] || "-";
+        const isMatch = inspector === selectedInspector;
+        const row = `<tr><td>${month} ${year}</td><td class="${isMatch ? 'highlight' : ''}">${inspector}</td></tr>`;
+        tbody.innerHTML += row;
+      });
+
+      table.style.display = "table";
+    }
+
+    loadData();
+  </script>
+</body>
+</html>
